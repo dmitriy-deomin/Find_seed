@@ -49,7 +49,6 @@ const BACKSPACE: char = 8u8 as char;
 const FILE_CONFIG: &str = "confSeed.txt";
 const FILE_LIST: &str = "bip39.txt";
 
-
 #[tokio::main]
 async fn main() {
     let version: &str = env!("CARGO_PKG_VERSION");
@@ -75,7 +74,7 @@ async fn main() {
 
     let cpu_core: usize = first_word(&conf[0].to_string()).to_string().parse::<usize>().unwrap();
     let mut dlinn_a_pasvord: usize = first_word(&conf[1].to_string()).to_string().parse::<usize>().unwrap();
-    let mut alvabet = first_word(&conf[2].to_string()).to_string();
+    let alvabet = first_word(&conf[2].to_string()).to_string();
     let len_uvelichenie = string_to_bool(first_word(&conf[3].to_string()).to_string());
     let start_perebor = first_word(&conf[4].to_string()).to_string();
     let mode: usize = first_word(&conf[5].to_string()).to_string().parse::<usize>().unwrap();
@@ -470,25 +469,23 @@ async fn main() {
 
     //алфавит
     //-------------------------------------------------------------------------
-    //пустой список
-    let mut lines = vec!["первый".to_string()];
-    if alvabet == "bip39.txt" {
-        println!("{}", blue("ИСПОЛЬЗОВАНИЕ bip39.txt ВМЕСТО АЛФАВИТА"));
-        get_len_find_create(FILE_LIST);
-        //если включенно рандомный список
-        let list = read_lines(FILE_LIST);
-        println!("{}", blue("-ОБРАБОТКА bip39.txt"));
-        // Преобразуем строки в вектор
-        lines = list.filter_map(Result::ok).collect::<Vec<String>>();
-        if rand_alfabet { lines = get_rand_list(lines, size_rand_alfabet) };
-        if rand_alfabet {
-            println!("{}{}", blue("СЛУЧАЙНЫЕ ИЗ СПИСКА:"), green("ВКЛЮЧЕННО"));
-            println!("{}{}", blue("-КОЛИЧЕСТВО СЛУЧАЙНЫХ ИЗ СПИСКА:"), green(size_rand_alfabet));
-            println!("{}{}", blue("-СПИСОК:"), green(lines.join(" ")));
-        };
-        println!("{}", blue("-ГОТОВО"));
-        println!("{}{}", blue("КОЛИЧЕСТВО ЗНАКОВ ПЕРЕБОРА СЛЕВА:"), green(comb_perebor_left));
-    }
+    println!("{}", blue("ИСПОЛЬЗОВАНИЕ bip39.txt ВМЕСТО АЛФАВИТА"));
+    get_len_find_create(FILE_LIST);
+    //если включенно рандомный список
+    let list = read_lines(FILE_LIST);
+    println!("{}", blue("-ОБРАБОТКА bip39.txt"));
+    // Преобразуем строки в вектор
+    let mut lines = list.filter_map(Result::ok).collect::<Vec<String>>();
+    if rand_alfabet { lines = get_rand_list(lines, size_rand_alfabet) };
+    if rand_alfabet {
+        println!("{}{}", blue("СЛУЧАЙНЫЕ ИЗ СПИСКА:"), green("ВКЛЮЧЕННО"));
+        println!("{}{}", blue("-КОЛИЧЕСТВО СЛУЧАЙНЫХ ИЗ СПИСКА:"), green(size_rand_alfabet));
+        println!("{}{}", blue("-СПИСОК:"), green(lines.join(" ")));
+    };
+    println!("{}", blue("-ГОТОВО"));
+    println!("{}{}", blue("КОЛИЧЕСТВО ЗНАКОВ ПЕРЕБОРА СЛЕВА:"), green(comb_perebor_left));
+    println!("{}{}", blue("НАЧАЛО ПЕРЕБОРА:"), green(start_perebor.clone()));
+
     //-------------------------------------------------------------------------------
     if mode > 2 {
         println!("{}", red("!!!"));
@@ -546,7 +543,7 @@ async fn main() {
             loop {
                 let password_string: String = receiver.recv().unwrap_or("error".to_string());
 
-                let mut start = Instant::now();
+                //let mut start = Instant::now();
 
                 //получаем все возможные
                 let mut list_mnemonik = Vec::new();
@@ -555,6 +552,7 @@ async fn main() {
                     let word_end = data::WORDS[i as usize].to_string();
                     mnemonic_test.push_str(&word_end);
                     if Mnemonic::validate(&mnemonic_test, Language::English).is_ok() {
+                        //println!("{}", mnemonic_test);
                         list_mnemonik.push(mnemonic_test);
                     }
                 }
@@ -574,7 +572,7 @@ async fn main() {
 
                     //ETH
                     //*******************************************************************************
-                    let h = get_private_key_from_seed(&xprv,"m/44'/60'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv, "m/44'/60'/0'/0/0");
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
                     #[cfg(windows)]
@@ -583,7 +581,7 @@ async fn main() {
                     };
 
                     #[cfg(not(windows))]
-                    let pk_u= {
+                    let pk_u = {
                         // Создаем секретный ключ из байт
                         let secret_key = SecretKey::from_slice(&h).expect("32 bytes, within curve order");
                         let public_key = PublicKey::from_secret_key(&secp, &secret_key);
@@ -591,7 +589,7 @@ async fn main() {
                     };
                     //----------------------------------------------------------------------------
                     if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
-                        if password_string!="инициализация"{
+                        if password_string != "инициализация" {
                             let adr_eth = hex::encode(get_eth_kessak_from_public_key(pk_u));
                             print_and_save_eth(hex::encode(&h), format!("ETH: 0x{adr_eth}"), &mnemonic_x);
                         }
@@ -602,7 +600,7 @@ async fn main() {
 
                     //TRX
                     //*******************************************************************************
-                    let h = get_private_key_from_seed(&xprv,"m/44'/195'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv, "m/44'/195'/0'/0/0");
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
                     #[cfg(windows)]
@@ -619,7 +617,7 @@ async fn main() {
                     };
                     //----------------------------------------------------------------------------
                     if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
-                        if password_string!="инициализация" {
+                        if password_string != "инициализация" {
                             let adr_eth = hex::encode(get_eth_kessak_from_public_key(pk_u));
                             let adr_trx = get_trx_from_eth(adr_eth);
                             print_and_save_eth(hex::encode(&h), format!("TRX: {adr_trx}"), &mnemonic_x);
@@ -632,7 +630,7 @@ async fn main() {
 
                     //BTC bip 44
                     //**********************************************************************************
-                    let h = get_private_key_from_seed(&xprv,"m/44'/0'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv, "m/44'/0'/0'/0/0");
 
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
@@ -655,7 +653,7 @@ async fn main() {
 
                     //проверка наличия в базе BTC compress
                     if database_cl.contains(&h160c) {
-                        if password_string!="инициализация" {
+                        if password_string != "инициализация" {
                             let address_btc = get_legacy(h160c, LEGACY_BTC);
                             let address = format!("BTC: {}", address_btc);
                             let private_key_c = hex_to_wif_compressed(&h.to_vec());
@@ -668,14 +666,14 @@ async fn main() {
 
                     //BTC bip 49
                     //**********************************************************************************
-                    let h = get_private_key_from_seed(&xprv,"m/49'/0'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv, "m/49'/0'/0'/0/0");
 
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
                     #[cfg(windows)]
                     let pk_c = {
                         let p = ice_library.privatekey_to_publickey(&h);
-                       ice_library.publickey_uncompres_to_compres(&p)
+                        ice_library.publickey_uncompres_to_compres(&p)
                     };
 
                     #[cfg(not(windows))]
@@ -692,7 +690,7 @@ async fn main() {
 
                     //проверка наличия в базе BTC bip49 3.....
                     if database_cl.contains(&bip49_hash160) {
-                        if password_string!="инициализация" {
+                        if password_string != "инициализация" {
                             let address_btc = get_bip49_address(&bip49_hash160, BIP49_BTC);
                             let address = format!("BTC: {}", address_btc);
                             let private_key_c = hex_to_wif_compressed(&h.to_vec());
@@ -706,14 +704,14 @@ async fn main() {
 
                     //BTC bip 84
                     //**********************************************************************************
-                    let h = get_private_key_from_seed(&xprv,"m/84'/0'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv, "m/84'/0'/0'/0/0");
 
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
                     #[cfg(windows)]
                     let pk_c = {
                         let p = ice_library.privatekey_to_publickey(&h);
-                       ice_library.publickey_uncompres_to_compres(&p)
+                        ice_library.publickey_uncompres_to_compres(&p)
                     };
 
                     #[cfg(not(windows))]
@@ -729,7 +727,7 @@ async fn main() {
 
                     //проверка наличия в базе BTC compress
                     if database_cl.contains(&h160c) {
-                        if password_string!="инициализация" {
+                        if password_string != "инициализация" {
                             let address_btc_bip84 = segwit::encode(hrp::BC, segwit::VERSION_0, &h160c).unwrap();
                             let address = format!("BTC: {}", address_btc_bip84);
                             let private_key_c = hex_to_wif_compressed(&h.to_vec());
@@ -742,7 +740,7 @@ async fn main() {
 
                     //DOGY bip 44
                     //**********************************************************************************
-                    let h = get_private_key_from_seed(&xprv,"m/44'/3'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv, "m/44'/3'/0'/0/0");
 
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
@@ -765,7 +763,7 @@ async fn main() {
 
                     //проверка наличия в базе BTC compress
                     if database_cl.contains(&h160c) {
-                        if password_string!="инициализация" {
+                        if password_string != "инициализация" {
                             let address_btc = get_legacy(h160c, LEGACY_BTC);
                             let address = format!("DOGY: {}", address_btc);
                             let private_key_c = hex_to_wif_compressed(&h.to_vec());
@@ -775,15 +773,14 @@ async fn main() {
 
                     // println!("dogy {:?}",start.elapsed());
                     // start = Instant::now();
-
                 }
                 //шлём в главный поток для получения следующей задачи
                 main_sender.send(ch).unwrap();
             }
         });
         //зажигание хз костыль получился(выполняеться один раз при запуске потока)
-       sender.send("инициализация".to_string()).unwrap();
-       //sender.send("modify expand fever race brave rent frost creek ridge mountain protect".to_string()).unwrap();
+        sender.send("инициализация".to_string()).unwrap();
+        //sender.send("modify expand fever race brave rent frost creek ridge mountain protect".to_string()).unwrap();
         //sender.send("1".to_string()).unwrap();
         channels.push(sender);
     }
@@ -803,7 +800,7 @@ async fn main() {
     let mut current_combination = vec![0; dlinn_a_pasvord];
 
     // Разбиение строки на слова
-    let start_perebor_list: Vec<&str> = start_perebor.split_whitespace().collect();
+    let start_perebor_list: Vec<&str> = start_perebor.split(',').collect();
     //заполняем страртовыми значениями для фраз
     for d in comb_perebor_left..dlinn_a_pasvord {
         let position = match start_perebor_list.get(d) {
@@ -976,18 +973,6 @@ fn hex_to_wif_compressed(raw_hex: &Vec<u8>) -> String {
     }
 }
 
-fn hex_to_wif_uncompressed(raw_hex: &Vec<u8>) -> String {
-    if raw_hex.len() == 32 {
-        let mut v = [0; 37];
-        v[0] = 0x80;
-        v[1..33].copy_from_slice(&raw_hex[..]);
-        let checksum = sha256d(&v[0..33]);
-        v[33..37].copy_from_slice(&checksum[0..4]);
-        v.to_base58()
-    } else { format!("Ошибка hex меньше 64 :'{}'", hex::encode(raw_hex).to_string()) }
-}
-
-
 fn print_and_save(hex: String, key: &String, addres: String, password_string: &String) {
     println!("{}", cyan("\n!!!!!!!!!!!!!!!!!!!!!!FOUND!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
     println!("{}{}", cyan("СИД:"), cyan(password_string));
@@ -1158,22 +1143,6 @@ fn jdem_user_to_close_programm() {
     io::stdin().read_line(&mut input).expect("Ошибка чтения строки");
 }
 
-
-//берем случайные символы из строки
-fn get_rand_alfabet(alvabet: String, size_rand_alfabet: usize) -> String {
-    let mut rng = thread_rng();
-    let mut charset_chars: Vec<char> = alvabet.chars().collect();
-
-    // Перемешиваем символы
-    charset_chars.shuffle(&mut rng);
-
-    // Берем первые size_rand_alfabet символов
-    let selected_chars: Vec<char> = charset_chars.into_iter().take(size_rand_alfabet).collect();
-
-    // Создаем строку из выбранных символов
-    selected_chars.into_iter().collect()
-}
-
 //составляем случайный список из полного
 fn get_rand_list(mut list: Vec<String>, size_rand_alfabet: usize) -> Vec<String> {
     let mut rng = thread_rng();
@@ -1228,7 +1197,7 @@ fn load_from_file(file_path: &str) -> Result<HashSet<[u8; 20]>, Box<dyn std::err
     }
 }
 
-fn get_private_key_from_seed(xprv: &ExtendedPrivateKey<SigningKey>, der:&str) -> [u8; 32] {
+fn get_private_key_from_seed(xprv: &ExtendedPrivateKey<SigningKey>, der: &str) -> [u8; 32] {
     let derivation_path = DerivationPath::from_str(der).expect("Failed to create DerivationPath from string");
 
     let mut child_xprv = xprv.clone();
