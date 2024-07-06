@@ -539,20 +539,28 @@ async fn main() {
         #[cfg(not(windows))]
         let secp = Secp256k1::new();
 
+        // let mut start = Instant::now();
+        // start.elapsed()
+
         thread::spawn(move || {
             loop {
                 let password_string: String = receiver.recv().unwrap_or("error".to_string());
+
+                let mut start = Instant::now();
 
                 //получаем все возможные
                 let mut list_mnemonik = Vec::new();
                 for i in 0..2048 {
                     let mut mnemonic_test = String::from(format!("{password_string} "));
-                    let word12 = data::WORDS[i as usize].to_string();
-                    mnemonic_test.push_str(&word12);
+                    let word_end = data::WORDS[i as usize].to_string();
+                    mnemonic_test.push_str(&word_end);
                     if Mnemonic::validate(&mnemonic_test, Language::English).is_ok() {
                         list_mnemonik.push(mnemonic_test);
                     }
                 }
+
+                // println!("validete {:?}",start.elapsed());
+                // start = Instant::now();
 
                 for mnemonic_x in list_mnemonik {
 
@@ -561,7 +569,8 @@ async fn main() {
                     let seed = Seed::new(&mnemonic, "");
                     let xprv = XPrv::new(seed.as_bytes()).expect("Failed to create XPrv from seed");
 
-
+                    // println!("seed {:?}",start.elapsed());
+                    // start = Instant::now();
 
                     //ETH
                     //*******************************************************************************
@@ -588,7 +597,8 @@ async fn main() {
                         }
                     }
                     //*******************************************************************************
-
+                    // println!("eth {:?}",start.elapsed());
+                    // start = Instant::now();
 
                     //TRX
                     //*******************************************************************************
@@ -616,6 +626,9 @@ async fn main() {
                         }
                     }
                     //*******************************************************************************
+
+                    // println!("trx {:?}",start.elapsed());
+                    // start = Instant::now();
 
                     //BTC bip 44
                     //**********************************************************************************
@@ -649,6 +662,9 @@ async fn main() {
                             print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
                         }
                     }
+
+                    // println!("btc 44 {:?}",start.elapsed());
+                    // start = Instant::now();
 
                     //BTC bip 49
                     //**********************************************************************************
@@ -685,6 +701,9 @@ async fn main() {
                     }
                     //*******************************************************************************
 
+                    // println!("btc 49 {:?}",start.elapsed());
+                    // start = Instant::now();
+
                     //BTC bip 84
                     //**********************************************************************************
                     let h = get_private_key_from_seed(&xprv,"m/84'/0'/0'/0/0");
@@ -718,6 +737,8 @@ async fn main() {
                         }
                     }
 
+                    // println!("btc 84 {:?}",start.elapsed());
+                    // start = Instant::now();
 
                     //DOGY bip 44
                     //**********************************************************************************
@@ -751,6 +772,9 @@ async fn main() {
                             print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
                         }
                     }
+
+                    // println!("dogy {:?}",start.elapsed());
+                    // start = Instant::now();
 
                 }
                 //шлём в главный поток для получения следующей задачи
