@@ -9,7 +9,8 @@ use std::time::{Duration, Instant};
 use base58::{FromBase58, ToBase58};
 use bech32::{segwit, hrp};
 use bincode::{deserialize_from, serialize_into};
-use bip32::{DerivationPath, XPrv};
+use bip32::{DerivationPath, ExtendedPrivateKey, XPrv};
+use bip32::secp256k1::ecdsa::SigningKey;
 use bip39::{Language, Mnemonic, Seed};
 use rand::{Rng, thread_rng};
 use rand::seq::SliceRandom;
@@ -469,7 +470,6 @@ async fn main() {
 
     //алфавит
     //-------------------------------------------------------------------------
-    let alfabet_ili_list;
     //пустой список
     let mut lines = vec!["первый".to_string()];
     if alvabet == "bip39.txt" {
@@ -487,32 +487,7 @@ async fn main() {
             println!("{}{}", blue("-СПИСОК:"), green(lines.join(" ")));
         };
         println!("{}", blue("-ГОТОВО"));
-        alfabet_ili_list = false;
-    } else {
-        alfabet_ili_list = true;
-        alvabet = if rand_alfabet {
-            let rndalf = get_rand_alfabet(alvabet, size_rand_alfabet);
-            println!("{}{}", blue("СЛУЧАЙНЫЕ ИЗ АЛФАВИТА:"), green("ВКЛЮЧЕННО"));
-            println!("{}{}", blue("-КОЛИЧЕСТВО СЛУЧАЙНЫХ ИЗ АЛФАВИТА:"), green(size_rand_alfabet));
-            println!("{}{}", blue("-АЛФАВИТ:"), green(&rndalf));
-            rndalf
-        } else {
-            println!("{}{}", blue("СЛУЧАЙНЫЕ ИЗ АЛФАВИТА:"), green("ВЫКЛЮЧЕННО"));
-            if alvabet == "0" {
-                println!("{}{}", blue("АЛФАВИТ:"), green("ВСЕ ВОЗМОЖНЫЕ"));
-            } else {
-                println!("{}{}", blue("АЛФАВИТ:"), green(&alvabet));
-            }
-            alvabet
-        };
-
-        if mode == 0 {
-            println!("{}{}", blue("УВЕЛИЧЕНИЕ ДЛИННЫ ПАРОЛЯ:"), green(len_uvelichenie.clone()));
-            println!("{}{}", blue("НАЧАЛО ПЕРЕБОРА:"), green(start_perebor.clone()));
-        }
-        if mode == 2 {
-            println!("{}{}", blue("КОЛИЧЕСТВО ЗНАКОВ ПЕРЕБОРА СЛЕВА:"), green(comb_perebor_left));
-        }
+        println!("{}{}", blue("КОЛИЧЕСТВО ЗНАКОВ ПЕРЕБОРА СЛЕВА:"), green(comb_perebor_left));
     }
     //-------------------------------------------------------------------------------
     if mode > 2 {
@@ -580,12 +555,17 @@ async fn main() {
                 }
 
                 for mnemonic_x in list_mnemonik {
-                    //ETH
-                    //*******************************************************************************
+
+                    //готовим
                     let mnemonic = Mnemonic::from_phrase(&mnemonic_x, Language::English).unwrap();
                     let seed = Seed::new(&mnemonic, "");
-                    let h = get_private_key_from_seed(seed.as_bytes(),"m/44'/60'/0'/0/0");
+                    let xprv = XPrv::new(seed.as_bytes()).expect("Failed to create XPrv from seed");
 
+
+
+                    //ETH
+                    //*******************************************************************************
+                    let h = get_private_key_from_seed(&xprv,"m/44'/60'/0'/0/0");
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
                     #[cfg(windows)]
@@ -602,15 +582,17 @@ async fn main() {
                     };
                     //----------------------------------------------------------------------------
                     if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
+                        if password_string!="инициализация"{
                             let adr_eth = hex::encode(get_eth_kessak_from_public_key(pk_u));
                             print_and_save_eth(hex::encode(&h), format!("ETH: 0x{adr_eth}"), &mnemonic_x);
+                        }
                     }
                     //*******************************************************************************
 
 
                     //TRX
                     //*******************************************************************************
-                    let h = get_private_key_from_seed(seed.as_bytes(),"m/44'/195'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv,"m/44'/195'/0'/0/0");
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
                     #[cfg(windows)]
@@ -627,15 +609,17 @@ async fn main() {
                     };
                     //----------------------------------------------------------------------------
                     if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
+                        if password_string!="инициализация" {
                             let adr_eth = hex::encode(get_eth_kessak_from_public_key(pk_u));
                             let adr_trx = get_trx_from_eth(adr_eth);
                             print_and_save_eth(hex::encode(&h), format!("TRX: {adr_trx}"), &mnemonic_x);
+                        }
                     }
                     //*******************************************************************************
 
                     //BTC bip 44
                     //**********************************************************************************
-                    let h = get_private_key_from_seed(seed.as_bytes(),"m/44'/0'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv,"m/44'/0'/0'/0/0");
 
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
@@ -658,15 +642,17 @@ async fn main() {
 
                     //проверка наличия в базе BTC compress
                     if database_cl.contains(&h160c) {
+                        if password_string!="инициализация" {
                             let address_btc = get_legacy(h160c, LEGACY_BTC);
                             let address = format!("BTC: {}", address_btc);
                             let private_key_c = hex_to_wif_compressed(&h.to_vec());
                             print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
+                        }
                     }
 
                     //BTC bip 49
                     //**********************************************************************************
-                    let h = get_private_key_from_seed(seed.as_bytes(),"m/49'/0'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv,"m/49'/0'/0'/0/0");
 
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
@@ -690,16 +676,18 @@ async fn main() {
 
                     //проверка наличия в базе BTC bip49 3.....
                     if database_cl.contains(&bip49_hash160) {
+                        if password_string!="инициализация" {
                             let address_btc = get_bip49_address(&bip49_hash160, BIP49_BTC);
                             let address = format!("BTC: {}", address_btc);
                             let private_key_c = hex_to_wif_compressed(&h.to_vec());
                             print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
+                        }
                     }
                     //*******************************************************************************
 
                     //BTC bip 84
                     //**********************************************************************************
-                    let h = get_private_key_from_seed(seed.as_bytes(),"m/84'/0'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv,"m/84'/0'/0'/0/0");
 
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
@@ -722,16 +710,18 @@ async fn main() {
 
                     //проверка наличия в базе BTC compress
                     if database_cl.contains(&h160c) {
+                        if password_string!="инициализация" {
                             let address_btc_bip84 = segwit::encode(hrp::BC, segwit::VERSION_0, &h160c).unwrap();
                             let address = format!("BTC: {}", address_btc_bip84);
                             let private_key_c = hex_to_wif_compressed(&h.to_vec());
                             print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
+                        }
                     }
 
 
                     //DOGY bip 44
                     //**********************************************************************************
-                    let h = get_private_key_from_seed(seed.as_bytes(),"m/44'/3'/0'/0/0");
+                    let h = get_private_key_from_seed(&xprv,"m/44'/3'/0'/0/0");
 
                     // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                     //------------------------------------------------------------------------
@@ -754,10 +744,12 @@ async fn main() {
 
                     //проверка наличия в базе BTC compress
                     if database_cl.contains(&h160c) {
-                        let address_btc = get_legacy(h160c, LEGACY_BTC);
-                        let address = format!("DOGY: {}", address_btc);
-                        let private_key_c = hex_to_wif_compressed(&h.to_vec());
-                        print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
+                        if password_string!="инициализация" {
+                            let address_btc = get_legacy(h160c, LEGACY_BTC);
+                            let address = format!("DOGY: {}", address_btc);
+                            let private_key_c = hex_to_wif_compressed(&h.to_vec());
+                            print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
+                        }
                     }
 
                 }
@@ -766,7 +758,8 @@ async fn main() {
             }
         });
         //зажигание хз костыль получился(выполняеться один раз при запуске потока)
-       sender.send("modify expand fever race brave rent frost creek ridge mountain protect".to_string()).unwrap();
+       sender.send("инициализация".to_string()).unwrap();
+       //sender.send("modify expand fever race brave rent frost creek ridge mountain protect".to_string()).unwrap();
         //sender.send("1".to_string()).unwrap();
         channels.push(sender);
     }
@@ -909,7 +902,7 @@ async fn main() {
             if speed > time_save_tekushego_bodbora {
                 println!("{}{}", blue("ТЕКУЩИЙ ПОДБОР:"), green(password_string.clone()));
 
-                let alf = if alfabet_ili_list { alvabet.clone() } else { format!("List.txt Длинна{}", dlinn_a_pasvord) };
+                let alf = format!("List.txt Длинна{}", dlinn_a_pasvord);
 
                 add_v_file("ТЕКУЩИЙ ПОДБОР.txt", format!("{} {}\n", password_string.clone(), alf));
                 speed = 0;
@@ -1211,13 +1204,13 @@ fn load_from_file(file_path: &str) -> Result<HashSet<[u8; 20]>, Box<dyn std::err
     }
 }
 
-fn get_private_key_from_seed(seed: &[u8],der:&str) -> [u8; 32] {
-    let xprv = XPrv::new(seed).unwrap();
-    let derivation_path = DerivationPath::from_str(der).unwrap();
-    let mut child_xprv = xprv;
+fn get_private_key_from_seed(xprv: &ExtendedPrivateKey<SigningKey>, der:&str) -> [u8; 32] {
+    let derivation_path = DerivationPath::from_str(der).expect("Failed to create DerivationPath from string");
+
+    let mut child_xprv = xprv.clone();
     for index in derivation_path.into_iter() {
-        child_xprv = child_xprv.derive_child(index).unwrap();
+        child_xprv = child_xprv.derive_child(index).expect("Failed to derive child key");
     }
-    let private_key_bytes: [u8; 32] = child_xprv.private_key().to_bytes().into();
-    private_key_bytes
+
+    child_xprv.private_key().to_bytes().into()
 }
