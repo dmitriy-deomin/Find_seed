@@ -1,0 +1,57 @@
+[package]
+name = "Find_seed"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rustils="0.1.23"
+
+#цветной вывод в консоль
+console = "0.15.7"
+
+hex = "0.4.3"
+base58 = "0.2.0"
+
+sha2 = "0.11.0-pre.3"
+crypto-hash ="0.3.4"
+
+#для поиска по сид фразе
+tiny-bip39 = "1.0.0"
+bip32 = "0.5.1"
+
+sv = "0.2.2"
+tokio = { version = "1.37.0", features = ["rt", "rt-multi-thread", "macros"] }
+itertools = "0.13.0"
+num_cpus = "1.16.0"
+rand = "0.8.5"
+
+#сохранять HashSet<[u8; 20]> базу и читать из файла
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+
+#eth
+tiny-hderive = "0.3.0"
+tiny-keccak = {version = "2.0.2", features = ['keccak']}
+
+#bip49
+ripemd="0.1.3"
+
+#bip84
+bech32 = "0.11.0"
+
+[target.'cfg(not(windows))'.dependencies]
+rust_secp256k1 = { version = "0.29.0", package = "secp256k1" }
+
+#ice_secp256k1 либа для винды
+[target.'cfg(windows)'.dependencies]
+libloading = "0.8.1"
+lazy_static = "1.4.0"
+once_cell = "1.19.0"
+
+#это нужно для иконки в винде
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"
+
+#Минимизирует размер кода
+[profile.release]
+opt-level = 3
