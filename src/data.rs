@@ -1,6 +1,6 @@
 pub fn get_conf_text()->String{
     let t = "1 -Количество ядер процессора \n\
-    11 -Длинна сид фразы \n\
+    11 -Длинна сид фразы(-1, для 12 указывать 11,15=14,18=17,21=20,24=23)\n\
     bip39.txt - Список слов\n\
     0 -Увеличивать длинну пароля в конце(0/1)\n\
     0 -Начало перебора(order,cover,plug,school,clown,one,satoshi,orange,plug,female,beyond)\n\
@@ -28,6 +28,7 @@ pub fn get_conf_text()->String{
 pub fn get_der_text()->String{
     let t = "m/44'/60'/0'/0/0\n\
     m/44'/195'/0'/0/0\n\
+    m/44'/60'/0'/0\n\
     m/44'/0'/0'/0/0\n\
     m/49'/0'/0'/0/0\n\
     m/84'/0'/0'/0/0\n\

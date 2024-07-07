@@ -7,7 +7,7 @@ use std::str::FromStr;
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 use base58::{FromBase58, ToBase58};
-use bech32::{segwit, hrp};
+use bech32::{segwit};
 use bincode::{deserialize_from, serialize_into};
 use bip32::{DerivationPath, ExtendedPrivateKey, XPrv};
 use bip32::secp256k1::ecdsa::SigningKey;
@@ -517,11 +517,11 @@ async fn main() {
     }
 
     println!("{}", blue("ПУТИ ДЕРИВАЦИИ"));
-    for d in der.iter(){
+    for d in der.iter() {
         println!("{}", blue(d.to_string()));
     };
 
-    if vivod_v_file{
+    if vivod_v_file {
         println!("{}", red("РЕЖИМ ОТЛАДКИ, ВЫВОД ПОДБОРА В ФАЙЛ: mnemonic_list.txt"));
     }
 
@@ -576,8 +576,8 @@ async fn main() {
                     let word_end = data::WORDS[i as usize].to_string();
                     mnemonic_test.push_str(&word_end);
                     if Mnemonic::validate(&mnemonic_test, Language::English).is_ok() {
-                        if vivod_v_file{
-                            add_v_file("mnemonic_list.txt",format!("{}\n",mnemonic_test));
+                        if vivod_v_file {
+                            add_v_file("mnemonic_list.txt", format!("{}\n", mnemonic_test));
                         }
                         list_mnemonik.push(mnemonic_test);
                     }
@@ -593,35 +593,34 @@ async fn main() {
                     let seed = Seed::new(&mnemonic, "");
                     let xprv = XPrv::new(seed.as_bytes()).expect("Failed to create XPrv from seed");
 
-                    for d in der.iter(){
+                    for d in der.iter() {
                         let h = get_private_key_from_seed(&xprv, d);
 
                         // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
                         //------------------------------------------------------------------------
                         #[cfg(windows)]
-                        let (pk_u,pk_c) = {
+                        let (pk_u, pk_c) = {
                             let p = ice_library.privatekey_to_publickey(&h);
-                            (p,ice_library.publickey_uncompres_to_compres(&p))
+                            (p, ice_library.publickey_uncompres_to_compres(&p))
                         };
 
                         #[cfg(not(windows))]
-                        let (pk_u,pk_c) = {
+                        let (pk_u, pk_c) = {
                             let secret_key = SecretKey::from_slice(&h).expect("32 bytes, within curve order");
                             let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-                            (public_key.serialize_uncompressed(),public_key.serialize())
+                            (public_key.serialize_uncompressed(), public_key.serialize())
                         };
                         //----------------------------------------------------------------------------
-                        if d.contains("/60") || d.contains("/195") {
-                            if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
-                                if password_string != "инициализация" {
-                                    print_and_save(hex::encode(&h), &hex::encode(get_eth_kessak_from_public_key(pk_u)), d.to_string(), &mnemonic_x);
-                                }
+
+                        if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
+                            if password_string != "инициализация" {
+                                print_and_save(hex::encode(&h), &hex::encode(get_eth_kessak_from_public_key(pk_u)), d.to_string(), &mnemonic_x);
                             }
-                        }else{
-                            if database_cl.contains(&hash160(&pk_c[0..]).0) {
-                                if password_string != "инициализация" {
-                                    print_and_save(hex::encode(&h), &hex::encode(hash160(&pk_c[0..]).0), d.to_string(), &mnemonic_x);
-                                }
+                        }
+
+                        if database_cl.contains(&hash160(&pk_c[0..]).0) {
+                            if password_string != "инициализация" {
+                                print_and_save(hex::encode(&h), &hex::encode(hash160(&pk_c[0..]).0), d.to_string(), &mnemonic_x);
                             }
                         }
                     }
@@ -630,9 +629,8 @@ async fn main() {
                 main_sender.send(ch).unwrap();
             }
         });
-        //зажигание хз костыль получился(выполняеться один раз при запуске потока)
         sender.send("инициализация".to_string()).unwrap();
-       // sender.send("modify expand fever race brave rent frost creek ridge mountain protect".to_string()).unwrap();
+        // sender.send("modify expand fever race brave rent frost creek ridge mountain protect".to_string()).unwrap();
         channels.push(sender);
     }
     //---------------------------------------------------------------------------------------------
@@ -810,20 +808,6 @@ fn add_v_file(name: &str, data: String) {
         .expect("write failed");
 }
 
-fn hex_to_wif_compressed(raw_hex: &Vec<u8>) -> String {
-    if raw_hex.len() == 32 {
-        let mut v = [0; 38];
-        v[0] = 0x80;
-        v[1..33].copy_from_slice(&raw_hex[..]);
-        v[33] = 0x01;
-        let checksum = sha256d(&v[0..34]);
-        v[34..38].copy_from_slice(&checksum[0..4]);
-        v.to_base58()
-    } else {
-        format!("Ошибка hex меньше 64 :'{}'", hex::encode(raw_hex).to_string())
-    }
-}
-
 fn print_and_save(hex: String, key: &String, addres: String, password_string: &String) {
     println!("{}", cyan("\n!!!!!!!!!!!!!!!!!!!!!!FOUND!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
     println!("{}{}", cyan("СИД:"), cyan(password_string));
@@ -835,6 +819,7 @@ fn print_and_save(hex: String, key: &String, addres: String, password_string: &S
     println!("{}", cyan("СОХРАНЕНО В FOUND.txt"));
     println!("{}", cyan("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
 }
+
 fn sha256d(data: &[u8]) -> [u8; 32] {
     let digest1 = Sha256::digest(data);
     let digest2 = Sha256::digest(&digest1);
