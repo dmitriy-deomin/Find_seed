@@ -31,6 +31,7 @@ mod ice_library;
 
 #[cfg(windows)]
 use ice_library::IceLibrary;
+use crate::data::WORDS;
 
 mod color;
 mod data;
@@ -48,7 +49,6 @@ pub const LEGACY_LTC: u8 = 0x30;
 const BACKSPACE: char = 8u8 as char;
 const FILE_CONFIG: &str = "confSeed.txt";
 const FILE_DER: &str = "der.txt";
-const FILE_LIST: &str = "bip39.txt";
 
 #[tokio::main]
 async fn main() {
@@ -86,16 +86,14 @@ async fn main() {
 
     let cpu_core: usize = first_word(&conf[0].to_string()).to_string().parse::<usize>().unwrap();
     let mut dlinn_a_pasvord: usize = first_word(&conf[1].to_string()).to_string().parse::<usize>().unwrap();
-    let alvabet = first_word(&conf[2].to_string()).to_string();
-    let len_uvelichenie = string_to_bool(first_word(&conf[3].to_string()).to_string());
-    let start_perebor = first_word(&conf[4].to_string()).to_string();
-    let mode: usize = first_word(&conf[5].to_string()).to_string().parse::<usize>().unwrap();
-    let comb_perebor_left_: usize = first_word(&conf[6].to_string()).to_string().parse::<usize>().unwrap();
-    let show_info = string_to_bool(first_word(&conf[7].to_string()).to_string());
-    let rand_alfabet = string_to_bool(first_word(&conf[8].to_string()).to_string());
-    let size_rand_alfabet = first_word(&conf[9].to_string()).to_string().parse::<usize>().unwrap();
-    let time_save_tekushego_bodbora = first_word(&conf[10].to_string()).to_string().parse::<u32>().unwrap();
-    let vivod_v_file = string_to_bool(first_word(&conf[11].to_string()).to_string());
+    let start_perebor = first_word(&conf[2].to_string()).to_string();
+    let mode: usize = first_word(&conf[3].to_string()).to_string().parse::<usize>().unwrap();
+    let comb_perebor_left_: usize = first_word(&conf[4].to_string()).to_string().parse::<usize>().unwrap();
+    let show_info = string_to_bool(first_word(&conf[5].to_string()).to_string());
+    let rand_alfabet = string_to_bool(first_word(&conf[6].to_string()).to_string());
+    let size_rand_alfabet = first_word(&conf[7].to_string()).to_string().parse::<usize>().unwrap();
+    let time_save_tekushego_bodbora = first_word(&conf[8].to_string()).to_string().parse::<u32>().unwrap();
+    let vivod_v_file = string_to_bool(first_word(&conf[9].to_string()).to_string());
     //---------------------------------------------------------------------
 
     //если укажут меньше или 0
@@ -167,7 +165,6 @@ async fn main() {
                     }
                 };
 
-
                 if let Err(e) = file.write_all(&binding) {
                     eprintln!("Не удалось записать в файл: {}", e);
                 } else {
@@ -179,60 +176,6 @@ async fn main() {
         //-----------------------------------------------------------------------------------------------
 
         println!("{}", blue("--"));
-        //провереряем если файл с хешами BTC
-        //--------------------------------------------------------------------------------------------
-        if fs::metadata(Path::new("btc_h160.bin")).is_ok() {
-            println!("{}", green("файл btc_h160.bin уже существует,конвертирование пропущено"));
-        } else {
-            //проверяем есть ли файл(создаём) и считаем сколько строк
-            let len_btc_txt = get_len_find_create("btc.txt");
-
-            println!("{}", blue("конвертирование адресов в h160 и сохранение в btc_h160.bin"));
-            //конвертируем в h160 и записываем в файл рядом
-            //создаём файл
-            let mut file = File::create("btc_h160.bin").unwrap();
-            //ищем в списке нужные делаем им харакири и ложим обрубки в файл
-            let mut len_btc = 0;
-            for (index, address) in get_bufer_file("btc.txt").lines().enumerate() {
-                let address = address.expect("Ошибка чтения адреса со строки");
-
-                //адреса с bc1...
-                let binding = if address.starts_with("bc1") {
-                    bip84_to_h160(address)
-                } else {
-                    //адреса 1.. 3...
-                    match address.from_base58() {
-                        Ok(value) => {
-                            let mut a: [u8; 20] = [0; 20];
-                            if value.len() >= 21 {
-                                a.copy_from_slice(&value.as_slice()[1..21]);
-                                a
-                            } else {
-                                eprintln!("{}", red(format!("ОШИБКА, АДРЕС НЕ ВАЛИДЕН строка: {} {}", index + 1, address)));
-                                continue; // Skip this address and move to the next
-                            }
-                        }
-                        Err(_) => {
-                            eprintln!("{}", red(format!("ОШИБКА ДЕКОДИРОВАНИЯ В base58 строка: {} {}", index + 1, address)));
-                            continue; // Skip this address and move to the next
-                        }
-                    }
-                };
-
-
-                if let Err(e) = file.write_all(&binding) {
-                    eprintln!("Не удалось записать в файл: {}", e);
-                } else {
-                    len_btc = len_btc + 1;
-                }
-            }
-            println!("{}", blue(format!("конвертировано адресов в h160:{}/{}", green(len_btc_txt), green(len_btc))));
-        }
-        //-----------------------------------------------------------------------------------------------
-
-
-        println!("{}", blue("--"));
-
         //провереряем если файл с хешами DOGECOIN
         //--------------------------------------------------------------------------------------------
         if fs::metadata(Path::new("dogecoin_h160.bin")).is_ok() {
@@ -480,22 +423,15 @@ async fn main() {
     println!("{}{}{}", blue("КОЛИЧЕСТВО ЯДЕР ПРОЦЕССОРА:"), green(cpu_core), blue(format!("/{count_cpu}")));
     println!("{}{}", blue("ДЛИНА ПАРОЛЯ:"), green(dlinn_a_pasvord));
 
-    //алфавит
     //-------------------------------------------------------------------------
-    println!("{}", blue("ИСПОЛЬЗОВАНИЕ bip39.txt ВМЕСТО АЛФАВИТА"));
-    get_len_find_create(FILE_LIST);
-    //если включенно рандомный список
-    let list = read_lines(FILE_LIST);
-    println!("{}", blue("-ОБРАБОТКА bip39.txt"));
     // Преобразуем строки в вектор
-    let mut lines = list.filter_map(Result::ok).collect::<Vec<String>>();
+    let mut lines = WORDS.iter().map(|&s| s.to_string()).collect();
     if rand_alfabet { lines = get_rand_list(lines, size_rand_alfabet) };
     if rand_alfabet {
         println!("{}{}", blue("СЛУЧАЙНЫЕ ИЗ СПИСКА:"), green("ВКЛЮЧЕННО"));
         println!("{}{}", blue("-КОЛИЧЕСТВО СЛУЧАЙНЫХ ИЗ СПИСКА:"), green(size_rand_alfabet));
         println!("{}{}", blue("-СПИСОК:"), green(lines.join(" ")));
     };
-    println!("{}", blue("-ГОТОВО"));
     println!("{}{}", blue("КОЛИЧЕСТВО ЗНАКОВ ПЕРЕБОРА СЛЕВА:"), green(comb_perebor_left));
     println!("{}{}", blue("НАЧАЛО ПЕРЕБОРА:"), green(start_perebor.clone()));
 
@@ -569,6 +505,12 @@ async fn main() {
 
                 //let mut start = Instant::now();
 
+                if vivod_v_file{
+                    if vivod_v_file {
+                        add_v_file("mnemonic_list.txt", format!("ВСЕ ВОЗМОЖНЫЕ ВАРИАНТЫ ПО ФРАЗЕ:{}\n--------------------------\n", password_string));
+                    }
+                }
+
                 //получаем все возможные
                 let mut list_mnemonik = Vec::new();
                 for i in 0..2048 {
@@ -623,6 +565,17 @@ async fn main() {
                                 print_and_save(hex::encode(&h), &hex::encode(hash160(&pk_c[0..]).0), d.to_string(), &mnemonic_x);
                             }
                         }
+
+
+                        if vivod_v_file {
+                            let kessak = hex::encode(get_eth_kessak_from_public_key(pk_u));
+                            let h160 = hex::encode(hash160(&pk_c[0..]).0);
+                            let pk_u = hex::encode(pk_u);
+                            let pk_c = hex::encode(pk_c);
+                            add_v_file("mnemonic_list.txt", format!("СИД:{mnemonic_x}\n\
+                            ДЕРИВАЦИЯ:{d}\nПУБЛИЧНЫЙ НЕСЖАТЫЙ:{pk_u}\nПУБЛИЧНЫЙ СЖАТЫЙ:{pk_c}\nКЕССАК:{kessak}\nХЕШ160:{h160}\
+                            \n------------------------------------\n"));
+                        }
                     }
                 }
                 //шлём в главный поток для получения следующей задачи
@@ -656,7 +609,7 @@ async fn main() {
             Some(&ch) => {
                 // Находим позицию слова в charset_chars
                 lines.iter().position(|c| c == ch).unwrap_or_else(|| {
-                    eprintln!("{}", format!("Слово:{} из *начала перебора* не найдено, установлено первое из алфавита", ch));
+                    eprintln!("{}", format!("Слово:{} из *начала перебора* не найдено, установлено первое из словаря", ch));
                     0
                 })
             }
@@ -689,17 +642,9 @@ async fn main() {
             }
 
             if i == 0 && current_combination[0] == charset_len - 1 {
-                //если включенно увеличение длинны увеличим иначе выйдем из цикла
-                if len_uvelichenie {
-                    println!("{}{}", blue(format!("ДЛИНА ПАРОЛЯ:{}", green(dlinn_a_pasvord))), magenta(format!(" ПЕРЕБРАТА за:{:?}", start.elapsed())));
-                    dlinn_a_pasvord = dlinn_a_pasvord + 1;
-                    current_combination = vec![0; dlinn_a_pasvord];
-                    println!("{}{:?}", blue("ТЕКУЩАЯ ДЛИНА ПАРОЛЯ:"), green(dlinn_a_pasvord));
-                } else {
-                    println!("{}", blue(format!("ГОТОВО,перебраты все возможные из {} длинной {}", alvabet, dlinn_a_pasvord)));
+                    println!("{}", blue("ГОТОВО,перебраты все возможные"));
                     jdem_user_to_close_programm();
                     break;
-                }
             }
 
             let mut s = String::new();
@@ -928,7 +873,6 @@ pub fn get_len_find_create(coin: &str) -> usize {
                 "dogecoin.txt" => { include_str!("dogecoin.txt") }
                 "eth.txt" => { include_str!("eth.txt") }
                 "trx.txt" => { include_str!("trx.txt") }
-                "bip39.txt" => { include_str!("bip39.txt") }
                 _ => { include_str!("btc.txt") }
             };
             add_v_file(coin, dockerfile.to_string());
