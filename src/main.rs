@@ -47,6 +47,7 @@ pub const LEGACY_LTC: u8 = 0x30;
 
 const BACKSPACE: char = 8u8 as char;
 const FILE_CONFIG: &str = "confSeed.txt";
+const FILE_DER: &str = "der.txt";
 const FILE_LIST: &str = "bip39.txt";
 
 #[tokio::main]
@@ -61,10 +62,21 @@ async fn main() {
     let conf = match lines_from_file(&FILE_CONFIG) {
         Ok(text) => { text }
         Err(_) => {
-            add_v_file(&FILE_CONFIG, data::get_conf_text().to_string());
+            add_v_file(&FILE_CONFIG, data::get_conf_text());
             lines_from_file(&FILE_CONFIG).unwrap()
         }
     };
+
+    //Чтение деревальвации, и если их нет создадим
+    //-----------------------------------------------------------------
+    let der = match lines_from_file(&FILE_DER) {
+        Ok(text) => { text }
+        Err(_) => {
+            add_v_file(&FILE_DER, data::get_der_text());
+            lines_from_file(&FILE_DER).unwrap()
+        }
+    };
+
 
     //рандом
     let mut rng = rand::thread_rng();
@@ -83,6 +95,7 @@ async fn main() {
     let rand_alfabet = string_to_bool(first_word(&conf[8].to_string()).to_string());
     let size_rand_alfabet = first_word(&conf[9].to_string()).to_string().parse::<usize>().unwrap();
     let time_save_tekushego_bodbora = first_word(&conf[10].to_string()).to_string().parse::<u32>().unwrap();
+    let vivod_v_file = string_to_bool(first_word(&conf[11].to_string()).to_string());
     //---------------------------------------------------------------------
 
     //если укажут меньше или 0
@@ -503,6 +516,15 @@ async fn main() {
         println!("{}{}", blue("-ВРЕМЯ АВТОСОХРАНЕНИЯ ТЕКУЩЕГО ПОДБОРА:"), green(time_save_tekushego_bodbora.clone()));
     }
 
+    println!("{}", blue("ПУТИ ДЕРИВАЦИИ"));
+    for d in der.iter(){
+        println!("{}", blue(d.to_string()));
+    };
+
+    if vivod_v_file{
+        println!("{}", red("РЕЖИМ ОТЛАДКИ, ВЫВОД ПОДБОРА В ФАЙЛ: mnemonic_list.txt"));
+    }
+
     println!("{}", blue("************************************"));
     //|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
@@ -515,12 +537,14 @@ async fn main() {
     let mut channels = Vec::new();
 
     let database = Arc::new(database);
+    let dereval = Arc::new(der);
 
     for ch in 0..cpu_core {
         //создаём для каждого потока отдельный канал для связи
         let (sender, receiver) = mpsc::channel();
 
         let database_cl = database.clone();
+        let der = dereval.clone();
 
         //главный поток
         let main_sender = main_sender.clone();
@@ -552,7 +576,9 @@ async fn main() {
                     let word_end = data::WORDS[i as usize].to_string();
                     mnemonic_test.push_str(&word_end);
                     if Mnemonic::validate(&mnemonic_test, Language::English).is_ok() {
-                        //println!("{}", mnemonic_test);
+                        if vivod_v_file{
+                            add_v_file("mnemonic_list.txt",format!("{}\n",mnemonic_test));
+                        }
                         list_mnemonik.push(mnemonic_test);
                     }
                 }
@@ -567,212 +593,38 @@ async fn main() {
                     let seed = Seed::new(&mnemonic, "");
                     let xprv = XPrv::new(seed.as_bytes()).expect("Failed to create XPrv from seed");
 
-                    // println!("seed {:?}",start.elapsed());
-                    // start = Instant::now();
+                    for d in der.iter(){
+                        let h = get_private_key_from_seed(&xprv, d);
 
-                    //ETH
-                    //*******************************************************************************
-                    let h = get_private_key_from_seed(&xprv, "m/44'/60'/0'/0/0");
-                    // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
-                    //------------------------------------------------------------------------
-                    #[cfg(windows)]
-                    let pk_u = {
-                        ice_library.privatekey_to_publickey(&h)
-                    };
+                        // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
+                        //------------------------------------------------------------------------
+                        #[cfg(windows)]
+                        let (pk_u,pk_c) = {
+                            let p = ice_library.privatekey_to_publickey(&h);
+                            (p,ice_library.publickey_uncompres_to_compres(&p))
+                        };
 
-                    #[cfg(not(windows))]
-                    let pk_u = {
-                        // Создаем секретный ключ из байт
-                        let secret_key = SecretKey::from_slice(&h).expect("32 bytes, within curve order");
-                        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-                        public_key.serialize_uncompressed()
-                    };
-                    //----------------------------------------------------------------------------
-                    if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
-                        if password_string != "инициализация" {
-                            let adr_eth = hex::encode(get_eth_kessak_from_public_key(pk_u));
-                            print_and_save_eth(hex::encode(&h), format!("ETH: 0x{adr_eth}"), &mnemonic_x);
+                        #[cfg(not(windows))]
+                        let (pk_u,pk_c) = {
+                            let secret_key = SecretKey::from_slice(&h).expect("32 bytes, within curve order");
+                            let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+                            (public_key.serialize_uncompressed(),public_key.serialize())
+                        };
+                        //----------------------------------------------------------------------------
+                        if d.contains("/60") || d.contains("/195") {
+                            if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
+                                if password_string != "инициализация" {
+                                    print_and_save(hex::encode(&h), &hex::encode(get_eth_kessak_from_public_key(pk_u)), d.to_string(), &mnemonic_x);
+                                }
+                            }
+                        }else{
+                            if database_cl.contains(&hash160(&pk_c[0..]).0) {
+                                if password_string != "инициализация" {
+                                    print_and_save(hex::encode(&h), &hex::encode(hash160(&pk_c[0..]).0), d.to_string(), &mnemonic_x);
+                                }
+                            }
                         }
                     }
-                    //*******************************************************************************
-                    // println!("eth {:?}",start.elapsed());
-                    // start = Instant::now();
-
-                    //TRX
-                    //*******************************************************************************
-                    let h = get_private_key_from_seed(&xprv, "m/44'/195'/0'/0/0");
-                    // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
-                    //------------------------------------------------------------------------
-                    #[cfg(windows)]
-                    let pk_u = {
-                        ice_library.privatekey_to_publickey(&h)
-                    };
-
-                    #[cfg(not(windows))]
-                    let pk_u = {
-                        // Создаем секретный ключ из байт
-                        let secret_key = SecretKey::from_slice(&h).expect("32 bytes, within curve order");
-                        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-                        public_key.serialize_uncompressed()
-                    };
-                    //----------------------------------------------------------------------------
-                    if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
-                        if password_string != "инициализация" {
-                            let adr_eth = hex::encode(get_eth_kessak_from_public_key(pk_u));
-                            let adr_trx = get_trx_from_eth(adr_eth);
-                            print_and_save_eth(hex::encode(&h), format!("TRX: {adr_trx}"), &mnemonic_x);
-                        }
-                    }
-                    //*******************************************************************************
-
-                    // println!("trx {:?}",start.elapsed());
-                    // start = Instant::now();
-
-                    //BTC bip 44
-                    //**********************************************************************************
-                    let h = get_private_key_from_seed(&xprv, "m/44'/0'/0'/0/0");
-
-                    // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
-                    //------------------------------------------------------------------------
-                    #[cfg(windows)]
-                    let pk_c = {
-                        let p = ice_library.privatekey_to_publickey(&h);
-                        ice_library.publickey_uncompres_to_compres(&p)
-                    };
-
-                    #[cfg(not(windows))]
-                    let pk_c = {
-                        // Создаем секретный ключ из байт
-                        let secret_key = SecretKey::from_slice(&h).expect("32 bytes, within curve order");
-                        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-                        public_key.serialize()
-                    };
-                    //----------------------------------------------------------------------------
-                    //получем из них хеш160
-                    let h160c = hash160(&pk_c[0..]).0;
-
-                    //проверка наличия в базе BTC compress
-                    if database_cl.contains(&h160c) {
-                        if password_string != "инициализация" {
-                            let address_btc = get_legacy(h160c, LEGACY_BTC);
-                            let address = format!("BTC: {}", address_btc);
-                            let private_key_c = hex_to_wif_compressed(&h.to_vec());
-                            print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
-                        }
-                    }
-
-                    // println!("btc 44 {:?}",start.elapsed());
-                    // start = Instant::now();
-
-                    //BTC bip 49
-                    //**********************************************************************************
-                    let h = get_private_key_from_seed(&xprv, "m/49'/0'/0'/0/0");
-
-                    // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
-                    //------------------------------------------------------------------------
-                    #[cfg(windows)]
-                    let pk_c = {
-                        let p = ice_library.privatekey_to_publickey(&h);
-                        ice_library.publickey_uncompres_to_compres(&p)
-                    };
-
-                    #[cfg(not(windows))]
-                    let pk_c = {
-                        // Создаем секретный ключ из байт
-                        let secret_key = SecretKey::from_slice(&h).expect("32 bytes, within curve order");
-                        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-                        public_key.serialize()
-                    };
-                    //----------------------------------------------------------------------------
-                    //получем из них хеш160
-                    let h160c = hash160(&pk_c[0..]).0;
-                    let bip49_hash160 = bip_49_hash160c(h160c);
-
-                    //проверка наличия в базе BTC bip49 3.....
-                    if database_cl.contains(&bip49_hash160) {
-                        if password_string != "инициализация" {
-                            let address_btc = get_bip49_address(&bip49_hash160, BIP49_BTC);
-                            let address = format!("BTC: {}", address_btc);
-                            let private_key_c = hex_to_wif_compressed(&h.to_vec());
-                            print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
-                        }
-                    }
-                    //*******************************************************************************
-
-                    // println!("btc 49 {:?}",start.elapsed());
-                    // start = Instant::now();
-
-                    //BTC bip 84
-                    //**********************************************************************************
-                    let h = get_private_key_from_seed(&xprv, "m/84'/0'/0'/0/0");
-
-                    // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
-                    //------------------------------------------------------------------------
-                    #[cfg(windows)]
-                    let pk_c = {
-                        let p = ice_library.privatekey_to_publickey(&h);
-                        ice_library.publickey_uncompres_to_compres(&p)
-                    };
-
-                    #[cfg(not(windows))]
-                    let (pk_u, pk_c) = {
-                        // Создаем секретный ключ из байт
-                        let secret_key = SecretKey::from_slice(&h).expect("32 bytes, within curve order");
-                        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-                        (public_key.serialize_uncompressed(), public_key.serialize())
-                    };
-                    //----------------------------------------------------------------------------
-                    //получем из них хеш160
-                    let h160c = hash160(&pk_c[0..]).0;
-
-                    //проверка наличия в базе BTC compress
-                    if database_cl.contains(&h160c) {
-                        if password_string != "инициализация" {
-                            let address_btc_bip84 = segwit::encode(hrp::BC, segwit::VERSION_0, &h160c).unwrap();
-                            let address = format!("BTC: {}", address_btc_bip84);
-                            let private_key_c = hex_to_wif_compressed(&h.to_vec());
-                            print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
-                        }
-                    }
-
-                    // println!("btc 84 {:?}",start.elapsed());
-                    // start = Instant::now();
-
-                    //DOGY bip 44
-                    //**********************************************************************************
-                    let h = get_private_key_from_seed(&xprv, "m/44'/3'/0'/0/0");
-
-                    // Получаем публичный ключ для разных систем , адрюха не дружит с ice_library
-                    //------------------------------------------------------------------------
-                    #[cfg(windows)]
-                    let pk_c = {
-                        let p = ice_library.privatekey_to_publickey(&h);
-                        ice_library.publickey_uncompres_to_compres(&p)
-                    };
-
-                    #[cfg(not(windows))]
-                    let pk_c = {
-                        // Создаем секретный ключ из байт
-                        let secret_key = SecretKey::from_slice(&h).expect("32 bytes, within curve order");
-                        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-                        public_key.serialize()
-                    };
-                    //----------------------------------------------------------------------------
-                    //получем из них хеш160
-                    let h160c = hash160(&pk_c[0..]).0;
-
-                    //проверка наличия в базе BTC compress
-                    if database_cl.contains(&h160c) {
-                        if password_string != "инициализация" {
-                            let address_btc = get_legacy(h160c, LEGACY_BTC);
-                            let address = format!("DOGY: {}", address_btc);
-                            let private_key_c = hex_to_wif_compressed(&h.to_vec());
-                            print_and_save(hex::encode(&h), &private_key_c, address, &mnemonic_x);
-                        }
-                    }
-
-                    // println!("dogy {:?}",start.elapsed());
-                    // start = Instant::now();
                 }
                 //шлём в главный поток для получения следующей задачи
                 main_sender.send(ch).unwrap();
@@ -780,8 +632,7 @@ async fn main() {
         });
         //зажигание хз костыль получился(выполняеться один раз при запуске потока)
         sender.send("инициализация".to_string()).unwrap();
-        //sender.send("modify expand fever race brave rent frost creek ridge mountain protect".to_string()).unwrap();
-        //sender.send("1".to_string()).unwrap();
+       // sender.send("modify expand fever race brave rent frost creek ridge mountain protect".to_string()).unwrap();
         channels.push(sender);
     }
     //---------------------------------------------------------------------------------------------
@@ -977,25 +828,13 @@ fn print_and_save(hex: String, key: &String, addres: String, password_string: &S
     println!("{}", cyan("\n!!!!!!!!!!!!!!!!!!!!!!FOUND!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
     println!("{}{}", cyan("СИД:"), cyan(password_string));
     println!("{}{}", cyan("HEX:"), cyan(hex.clone()));
-    println!("{}{}", cyan("PRIVATE KEY:"), cyan(key));
-    println!("{}{}", cyan("АДРЕСС:"), cyan(addres.clone()));
-    let s = format!("СИД:{}\nHEX:{}\nPRIVATE KEY: {}\nАДРЕСС {}\n\n", password_string, hex, key, addres);
+    println!("{}{}", cyan("ХЕШ(адрес):"), cyan(key));
+    println!("{}{}", cyan("ДЕРИВАЦИЯ:"), cyan(addres.clone()));
+    let s = format!("СИД:{}\nHEX:{}\nХЕШ(адрес): {}\nДЕРИВАЦИЯ: {}\n\n", password_string, hex, key, addres);
     add_v_file("FOUND.txt", s);
     println!("{}", cyan("СОХРАНЕНО В FOUND.txt"));
     println!("{}", cyan("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
 }
-
-fn print_and_save_eth(hex: String, addres: String, password_string: &String) {
-    println!("{}", cyan("\n!!!!!!!!!!!!!!!!!!!!!!FOUND!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
-    println!("{}{}", cyan("СИД:"), cyan(password_string));
-    println!("{}{}", cyan("HEX:"), cyan(hex.clone()));
-    println!("{}{}", cyan("АДРЕСС:"), cyan(addres.clone()));
-    let s = format!("СИД:{}\nHEX:{}\nАДРЕСС {}\n\n", password_string, hex, addres);
-    add_v_file("FOUND.txt", s);
-    println!("{}", cyan("СОХРАНЕНО В FOUND.txt"));
-    println!("{}", cyan("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
-}
-
 fn sha256d(data: &[u8]) -> [u8; 32] {
     let digest1 = Sha256::digest(data);
     let digest2 = Sha256::digest(&digest1);
