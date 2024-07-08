@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "Find_seed"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "base58 0.2.0",
  "bech32",
@@ -12,6 +12,7 @@ dependencies = [
  "bip32",
  "console",
  "crypto-hash",
+ "eip55",
  "hex 0.4.3",
  "itertools",
  "lazy_static",
@@ -447,6 +448,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "eip55"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f447686e1a032eb8529a9abda7a1d7751ccd143bc3ee2c47dfe9c6dc9eace421"
+dependencies = [
+ "hex 0.4.3",
+ "sha3",
+]
+
+[[package]]
 name = "either"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -663,6 +674,15 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "sha2 0.10.8",
+]
+
+[[package]]
+name = "keccak"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecc2af9a1119c51f12a14607e783cb977bde58bc069ff0c3da1095e635d70654"
+dependencies = [
+ "cpufeatures",
 ]
 
 [[package]]
@@ -1302,6 +1322,16 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest 0.11.0-pre.8",
+]
+
+[[package]]
+name = "sha3"
+version = "0.10.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75872d278a8f37ef87fa0ddbda7802605cb18344497949862c0d4dcb291eba60"
+dependencies = [
+ "digest 0.10.7",
+ "keccak",
 ]
 
 [[package]]

@@ -5,7 +5,6 @@ use std::io::{BufRead, BufReader, BufWriter, Lines, Read, stdout, Write};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, mpsc};
-use std::time::{Duration, Instant};
 use base58::{FromBase58, ToBase58};
 use bech32::{hrp, segwit};
 use bincode::{deserialize_from, serialize_into};
@@ -432,7 +431,7 @@ async fn main() {
         println!("{}{}", blue("-КОЛИЧЕСТВО СЛУЧАЙНЫХ ИЗ СПИСКА:"), green(size_rand_alfabet));
         println!("{}{}", blue("-СПИСОК:"), green(lines.join(" ")));
     };
-    println!("{}{}", blue("КОЛИЧЕСТВО ЗНАКОВ ПЕРЕБОРА СЛЕВА:"), green(comb_perebor_left));
+    println!("{}{}", blue("КОЛИЧЕСТВО СЛОВ ПЕРЕБОРА СЛЕВА:"), green(comb_perebor_left));
     println!("{}{}", blue("НАЧАЛО ПЕРЕБОРА:"), green(start_perebor.clone()));
 
     //-------------------------------------------------------------------------------
@@ -449,7 +448,7 @@ async fn main() {
         println!("{}{}", blue("ОТОБРАЖЕНИЕ СКОРОСТИ И ТЕКУЩЕГО ПОДБОРА:"), green("ВКЛЮЧЕННО"));
     } else {
         println!("{}{}", blue("ОТОБРАЖЕНИЕ СКОРОСТИ И ТЕКУЩЕГО ПОДБОРА:"), green("ОТКЛЮЧЕННО"));
-        println!("{}{}{}", blue("-АВТОСОХРАНЕНИЯ ПОСЛЕ ПОДБОРА:"), green(time_save_tekushego_bodbora.clone()), blue(" ФРАЗ"));
+        println!("{}{}{}", blue("-СОХРАНЕНИЯ ПОСЛЕ ПОДБОРА:"), green(time_save_tekushego_bodbora.clone()), blue(" ФРАЗ"));
     }
 
     println!("{}", blue("ПУТИ ДЕРИВАЦИИ"));
@@ -497,8 +496,10 @@ async fn main() {
         let secp = Secp256k1::new();
 
         thread::spawn(move || {
+            let mut list_mnemonik = Vec::new();
             loop {
                 let password_string: String = receiver.recv().unwrap_or("error".to_string());
+
 
                 if vivod_v_file {
                     if vivod_v_file {
@@ -507,7 +508,6 @@ async fn main() {
                 }
 
                 //получаем все возможные
-                let mut list_mnemonik = Vec::new();
                 for i in 0..2048 {
                     let mut mnemonic_test = String::from(format!("{password_string} "));
                     let word_end = data::WORDS[i as usize].to_string();
@@ -520,8 +520,7 @@ async fn main() {
                     }
                 }
 
-                for mnemonic_x in list_mnemonik {
-
+                for mnemonic_x in list_mnemonik.iter() {
                     //готовим
                     let mnemonic = Mnemonic::from_phrase(&mnemonic_x, Language::English).unwrap();
                     let seed = Seed::new(&mnemonic, "");
@@ -547,50 +546,49 @@ async fn main() {
                         //----------------------------------------------------------------------------
 
                         if database_cl.contains(&get_eth_kessak_from_public_key(pk_u)) {
-                            if password_string != "инициализация" {
+                            if mnemonic_x != "инициализация" {
                                 print_and_save(hex::encode(&h), &hex::encode(get_eth_kessak_from_public_key(pk_u)), d.to_string(), &mnemonic_x);
                             }
                         }
 
                         if database_cl.contains(&hash160(&pk_c[0..]).0) {
-                            if password_string != "инициализация" {
+                            if mnemonic_x != "инициализация" {
                                 print_and_save(hex::encode(&h), &hex::encode(hash160(&pk_c[0..]).0), d.to_string(), &mnemonic_x);
                             }
                         }
 
 
                         if vivod_v_file {
-                            if password_string != "инициализация" {
+                            let hu = hash160(&pk_u[0..]).0;
+                            let hc = hash160(&pk_c[0..]).0;
 
-                                let hu =hash160(&pk_u[0..]).0;
-                                let hc =hash160(&pk_c[0..]).0;
+                            let kessak = hex::encode(get_eth_kessak_from_public_key(pk_u));
+                            let h160u = hex::encode(hu);
+                            let h160c = hex::encode(hc);
 
-                                let kessak = hex::encode(get_eth_kessak_from_public_key(pk_u));
-                                let h160u = hex::encode(hu);
-                                let h160c = hex::encode(hc);
+                            let eth = format!("0x{kessak}");
+                            let adr_eth = format!("ETH:0x{kessak}");
+                            let adr_etheip = format!("ETH EIP55:{}", eip55::checksum(&*eth));
+                            let adr_trx = format!("TRX:{}", get_trx_from_eth(kessak.clone()));
 
-                                let adr_eth = format!("ETH:0x{kessak}");
-                                let adr_trx = format!("TRX:{}", get_trx_from_eth(kessak.clone()));
+                            let ad_btc44u = format!("BTC 44 uncompress:{}", get_legacy(hu, LEGACY_BTC));
+                            let ad_btc44c = format!("BTC 44 compress:{}", get_legacy(hc, LEGACY_BTC));
+                            let ad_btc49 = format!("BTC 49:{}", get_bip49_address(&bip_49_hash160c(hc), BIP49_BTC));
+                            let ad_btc84 = format!("BTC 84:{}", segwit::encode(hrp::BC, segwit::VERSION_0, &hc).unwrap());
 
-                                let ad_btc44u = format!("BTC 44 uncompress:{}", get_legacy(hu, LEGACY_BTC));
-                                let ad_btc44c = format!("BTC 44 compress:{}", get_legacy(hc, LEGACY_BTC));
-                                let ad_btc49 = format!("BTC 49:{}", get_bip49_address(&bip_49_hash160c(hc), BIP49_BTC));
-                                let ad_btc84 = format!("BTC 84:{}", segwit::encode(hrp::BC, segwit::VERSION_0, &hc).unwrap());
-
-                                let ad_dogy_leg = format!("DOGY 44:{}", get_legacy(hc, LEGACY_DOGE));
-                                let ad_dogy_49 = format!("DOGY 49:{}", get_bip49_address(&bip_49_hash160c(hc), BIP49_DOGE));
+                            let ad_dogy_leg = format!("DOGY 44:{}", get_legacy(hc, LEGACY_DOGE));
+                            let ad_dogy_49 = format!("DOGY 49:{}", get_bip49_address(&bip_49_hash160c(hc), BIP49_DOGE));
 
 
-                                let pk_u = hex::encode(pk_u);
-                                let pk_c = hex::encode(pk_c);
+                            let pk_u = hex::encode(pk_u);
+                            let pk_c = hex::encode(pk_c);
 
-                                add_v_file("mnemonic_list.txt", format!("СИД:{mnemonic_x}\n\
+                            add_v_file("mnemonic_list.txt", format!("СИД:{mnemonic_x}\n\
                             ДЕРИВАЦИЯ:{d}\nПУБЛИЧНЫЙ НЕСЖАТЫЙ:{pk_u}\nПУБЛИЧНЫЙ СЖАТЫЙ:{pk_c}\n\
-                            КЕССАК:{kessak}\n{adr_eth}\n{adr_trx}\n\
+                            КЕССАК:{kessak}\n{adr_eth}\n{adr_etheip}\n{adr_trx}\n\
                             ХЕШ160u:{h160u}\n{ad_btc44u}\n\
                             ХЕШ160c:{h160c}\n{ad_btc44c}\n{ad_btc49}\n{ad_btc84}\n{ad_dogy_leg}\n{ad_dogy_49}\
                             \n------------------------------------\n"));
-                            }
                         }
                     }
                 }
@@ -602,13 +600,13 @@ async fn main() {
         // sender.send("modify expand fever race brave rent frost creek ridge mountain protect".to_string()).unwrap();
         channels.push(sender);
     }
+
     //---------------------------------------------------------------------------------------------
 
 
     //подготовка к запуску главного цикла
     //-----------------------------------------------------------------------------------------
     //для измерения скорости
-    let mut time = Instant::now();
     let mut total: u64 = 0;
 
     let charset_len = lines.len();
@@ -642,7 +640,6 @@ async fn main() {
     //----------------------------------------------------------------------------------------------
     for received in main_receiver {
         let ch = received;
-
         // последовательный перебор
         if mode == 0 {
             let mut i = dlinn_a_pasvord;
@@ -717,15 +714,14 @@ async fn main() {
             password_string = s.trim().to_string();
         }
 
-        total = total +1;
+        total = total + 1;
         if show_info {
             let mut stdout = stdout();
-            print!("{}\r{}", BACKSPACE, green(format!("ПЕРЕБОР:{password_string}||ПЕРЕБРАТО:{total}||ПРОШЛО:{:?}     ",time.elapsed())));
-            time = Instant::now();
+            print!("{}\r{}", BACKSPACE, green(format!("ПЕРЕБОР:{password_string}||ПЕРЕБРАТО:{total}||    ", )));
             stdout.flush().unwrap();
         } else {
             // или через некоторое время будем сохранять в файл текущий подбор
-            if total > time_save_tekushego_bodbora{
+            if total > time_save_tekushego_bodbora {
                 println!("{}{}", blue("ТЕКУЩИЙ ПОДБОР:"), green(password_string.clone()));
 
                 let alf = format!("List.txt Длинна{}", dlinn_a_pasvord);
@@ -734,7 +730,6 @@ async fn main() {
                 total = 0;
             }
         }
-
 
         // Отправляем новую в свободный канал
         channels[ch].send(password_string.clone()).unwrap();
