@@ -7,7 +7,7 @@ use std::str::FromStr;
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 use base58::{FromBase58, ToBase58};
-use bech32::{segwit};
+use bech32::{hrp, segwit};
 use bincode::{deserialize_from, serialize_into};
 use bip32::{DerivationPath, ExtendedPrivateKey, XPrv};
 use bip32::secp256k1::ecdsa::SigningKey;
@@ -92,7 +92,7 @@ async fn main() {
     let show_info = string_to_bool(first_word(&conf[5].to_string()).to_string());
     let rand_alfabet = string_to_bool(first_word(&conf[6].to_string()).to_string());
     let size_rand_alfabet = first_word(&conf[7].to_string()).to_string().parse::<usize>().unwrap();
-    let time_save_tekushego_bodbora = first_word(&conf[8].to_string()).to_string().parse::<u32>().unwrap();
+    let time_save_tekushego_bodbora = first_word(&conf[8].to_string()).to_string().parse::<u64>().unwrap();
     let vivod_v_file = string_to_bool(first_word(&conf[9].to_string()).to_string());
     //---------------------------------------------------------------------
 
@@ -449,7 +449,7 @@ async fn main() {
         println!("{}{}", blue("ОТОБРАЖЕНИЕ СКОРОСТИ И ТЕКУЩЕГО ПОДБОРА:"), green("ВКЛЮЧЕННО"));
     } else {
         println!("{}{}", blue("ОТОБРАЖЕНИЕ СКОРОСТИ И ТЕКУЩЕГО ПОДБОРА:"), green("ОТКЛЮЧЕННО"));
-        println!("{}{}", blue("-ВРЕМЯ АВТОСОХРАНЕНИЯ ТЕКУЩЕГО ПОДБОРА:"), green(time_save_tekushego_bodbora.clone()));
+        println!("{}{}{}", blue("-АВТОСОХРАНЕНИЯ ПОСЛЕ ПОДБОРА:"), green(time_save_tekushego_bodbora.clone()), blue(" ФРАЗ"));
     }
 
     println!("{}", blue("ПУТИ ДЕРИВАЦИИ"));
@@ -496,16 +496,11 @@ async fn main() {
         #[cfg(not(windows))]
         let secp = Secp256k1::new();
 
-        // let mut start = Instant::now();
-        // start.elapsed()
-
         thread::spawn(move || {
             loop {
                 let password_string: String = receiver.recv().unwrap_or("error".to_string());
 
-                //let mut start = Instant::now();
-
-                if vivod_v_file{
+                if vivod_v_file {
                     if vivod_v_file {
                         add_v_file("mnemonic_list.txt", format!("ВСЕ ВОЗМОЖНЫЕ ВАРИАНТЫ ПО ФРАЗЕ:{}\n--------------------------\n", password_string));
                     }
@@ -524,9 +519,6 @@ async fn main() {
                         list_mnemonik.push(mnemonic_test);
                     }
                 }
-
-                // println!("validete {:?}",start.elapsed());
-                // start = Instant::now();
 
                 for mnemonic_x in list_mnemonik {
 
@@ -568,13 +560,37 @@ async fn main() {
 
 
                         if vivod_v_file {
-                            let kessak = hex::encode(get_eth_kessak_from_public_key(pk_u));
-                            let h160 = hex::encode(hash160(&pk_c[0..]).0);
-                            let pk_u = hex::encode(pk_u);
-                            let pk_c = hex::encode(pk_c);
-                            add_v_file("mnemonic_list.txt", format!("СИД:{mnemonic_x}\n\
-                            ДЕРИВАЦИЯ:{d}\nПУБЛИЧНЫЙ НЕСЖАТЫЙ:{pk_u}\nПУБЛИЧНЫЙ СЖАТЫЙ:{pk_c}\nКЕССАК:{kessak}\nХЕШ160:{h160}\
+                            if password_string != "инициализация" {
+
+                                let hu =hash160(&pk_u[0..]).0;
+                                let hc =hash160(&pk_c[0..]).0;
+
+                                let kessak = hex::encode(get_eth_kessak_from_public_key(pk_u));
+                                let h160u = hex::encode(hu);
+                                let h160c = hex::encode(hc);
+
+                                let adr_eth = format!("ETH:0x{kessak}");
+                                let adr_trx = format!("TRX:{}", get_trx_from_eth(kessak.clone()));
+
+                                let ad_btc44u = format!("BTC 44 uncompress:{}", get_legacy(hu, LEGACY_BTC));
+                                let ad_btc44c = format!("BTC 44 compress:{}", get_legacy(hc, LEGACY_BTC));
+                                let ad_btc49 = format!("BTC 49:{}", get_bip49_address(&bip_49_hash160c(hc), BIP49_BTC));
+                                let ad_btc84 = format!("BTC 84:{}", segwit::encode(hrp::BC, segwit::VERSION_0, &hc).unwrap());
+
+                                let ad_dogy_leg = format!("DOGY 44:{}", get_legacy(hc, LEGACY_DOGE));
+                                let ad_dogy_49 = format!("DOGY 49:{}", get_bip49_address(&bip_49_hash160c(hc), BIP49_DOGE));
+
+
+                                let pk_u = hex::encode(pk_u);
+                                let pk_c = hex::encode(pk_c);
+
+                                add_v_file("mnemonic_list.txt", format!("СИД:{mnemonic_x}\n\
+                            ДЕРИВАЦИЯ:{d}\nПУБЛИЧНЫЙ НЕСЖАТЫЙ:{pk_u}\nПУБЛИЧНЫЙ СЖАТЫЙ:{pk_c}\n\
+                            КЕССАК:{kessak}\n{adr_eth}\n{adr_trx}\n\
+                            ХЕШ160u:{h160u}\n{ad_btc44u}\n\
+                            ХЕШ160c:{h160c}\n{ad_btc44c}\n{ad_btc49}\n{ad_btc84}\n{ad_dogy_leg}\n{ad_dogy_49}\
                             \n------------------------------------\n"));
+                            }
                         }
                     }
                 }
@@ -592,9 +608,8 @@ async fn main() {
     //подготовка к запуску главного цикла
     //-----------------------------------------------------------------------------------------
     //для измерения скорости
-    let mut start = Instant::now();
-    let mut speed: u32 = 0;
-    let one_sek = Duration::from_secs(1);
+    let mut time = Instant::now();
+    let mut total: u64 = 0;
 
     let charset_len = lines.len();
 
@@ -623,7 +638,7 @@ async fn main() {
 
     //--ГЛАВНЫЙ ЦИКЛ
     // слушаем ответы потоков и если есть шлём новую задачу
-    let mut password_string = "stroka".to_string();
+    let mut password_string = "инициализация".to_string();
     //----------------------------------------------------------------------------------------------
     for received in main_receiver {
         let ch = received;
@@ -642,9 +657,9 @@ async fn main() {
             }
 
             if i == 0 && current_combination[0] == charset_len - 1 {
-                    println!("{}", blue("ГОТОВО,перебраты все возможные"));
-                    jdem_user_to_close_programm();
-                    break;
+                println!("{}", blue("ГОТОВО,перебраты все возможные"));
+                jdem_user_to_close_programm();
+                break;
             }
 
             let mut s = String::new();
@@ -702,27 +717,25 @@ async fn main() {
             password_string = s.trim().to_string();
         }
 
-        speed = speed + 128;
+        total = total +1;
         if show_info {
-            //измеряем скорость и шлём прогресс
-            if start.elapsed() >= one_sek {
-                let mut stdout = stdout();
-                print!("{}\r{}", BACKSPACE, green(format!("SPEED:{speed}/s|{}", format!("{}", password_string))));
-                stdout.flush().unwrap();
-                start = Instant::now();
-                speed = 0;
-            }
+            let mut stdout = stdout();
+            print!("{}\r{}", BACKSPACE, green(format!("ПЕРЕБОР:{password_string}||ПЕРЕБРАТО:{total}||ПРОШЛО:{:?}     ",time.elapsed())));
+            time = Instant::now();
+            stdout.flush().unwrap();
         } else {
             // или через некоторое время будем сохранять в файл текущий подбор
-            if speed > time_save_tekushego_bodbora {
+            if total > time_save_tekushego_bodbora{
                 println!("{}{}", blue("ТЕКУЩИЙ ПОДБОР:"), green(password_string.clone()));
 
                 let alf = format!("List.txt Длинна{}", dlinn_a_pasvord);
 
                 add_v_file("ТЕКУЩИЙ ПОДБОР.txt", format!("{} {}\n", password_string.clone(), alf));
-                speed = 0;
+                total = 0;
             }
         }
+
+
         // Отправляем новую в свободный канал
         channels[ch].send(password_string.clone()).unwrap();
     }
