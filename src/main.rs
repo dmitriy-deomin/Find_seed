@@ -1,6 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::{fs, io, thread};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::io::{BufRead, BufReader, BufWriter, Lines, Read, stdout, Write};
 use std::path::Path;
 use std::str::FromStr;
@@ -84,7 +84,7 @@ async fn main() {
     let count_cpu = num_cpus::get();
 
     let cpu_core: usize = first_word(&conf[0].to_string()).to_string().parse::<usize>().unwrap();
-    let mut dlinn_a_pasvord: usize = first_word(&conf[1].to_string()).to_string().parse::<usize>().unwrap();
+    let dlinn_a_pasvord: usize = first_word(&conf[1].to_string()).to_string().parse::<usize>().unwrap();
     let start_perebor = first_word(&conf[2].to_string()).to_string();
     let mode: usize = first_word(&conf[3].to_string()).to_string().parse::<usize>().unwrap();
     let comb_perebor_left_: usize = first_word(&conf[4].to_string()).to_string().parse::<usize>().unwrap();
@@ -101,7 +101,7 @@ async fn main() {
     } else { 1 };
 
     //база со всеми адресами
-    let mut database: HashSet<[u8; 20]> = HashSet::new();
+    let mut database: BTreeSet<[u8; 20]> = BTreeSet::new();
 
 
     //проверим есть ли общая база
@@ -420,7 +420,7 @@ async fn main() {
     //||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     println!("{}", blue("************************************"));
     println!("{}{}{}", blue("КОЛИЧЕСТВО ЯДЕР ПРОЦЕССОРА:"), green(cpu_core), blue(format!("/{count_cpu}")));
-    println!("{}{}", blue("ДЛИНА ПАРОЛЯ:"), green(dlinn_a_pasvord));
+    println!("{}{}", blue("ДЛИНА ФРАЗЫ:"), green(dlinn_a_pasvord));
 
     //-------------------------------------------------------------------------
     // Преобразуем строки в вектор
@@ -947,7 +947,7 @@ fn bip84_to_h160(address: String) -> [u8; 20] {
 
 
 //сохранение и загрузка базы из файла
-fn save_to_file(set: &HashSet<[u8; 20]>, file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn save_to_file(set: &BTreeSet<[u8; 20]>, file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     match File::create(file_path) {
         Ok(file) => {
             let writer = BufWriter::new(file);
@@ -960,7 +960,7 @@ fn save_to_file(set: &HashSet<[u8; 20]>, file_path: &str) -> Result<(), Box<dyn 
     }
 }
 
-fn load_from_file(file_path: &str) -> Result<HashSet<[u8; 20]>, Box<dyn std::error::Error>> {
+fn load_from_file(file_path: &str) -> Result<BTreeSet<[u8; 20]>, Box<dyn std::error::Error>> {
     match File::open(file_path) {
         Ok(file) => {
             let reader = BufReader::new(file);
