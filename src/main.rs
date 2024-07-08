@@ -5,6 +5,7 @@ use std::io::{BufRead, BufReader, BufWriter, Lines, Read, stdout, Write};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, mpsc};
+use std::time::{Duration, Instant};
 use base58::{FromBase58, ToBase58};
 use bech32::{hrp, segwit};
 use bincode::{deserialize_from, serialize_into};
@@ -101,7 +102,7 @@ async fn main() {
     } else { 1 };
 
     //база со всеми адресами
-    let mut database: BTreeSet<[u8; 20]> = BTreeSet::new();
+    let mut database:  HashSet<[u8; 20]> =  HashSet::new();
 
 
     //проверим есть ли общая база
@@ -633,6 +634,10 @@ async fn main() {
 
 
     //-----------------------------------------------------------------------------------
+    //для измерения скорости
+    let mut start = Instant::now();
+    let mut speed: u32 = 0;
+    let one_sek = Duration::from_secs(1);
 
     //--ГЛАВНЫЙ ЦИКЛ
     // слушаем ответы потоков и если есть шлём новую задачу
@@ -716,9 +721,13 @@ async fn main() {
 
         total = total + 1;
         if show_info {
-            let mut stdout = stdout();
-            print!("{}\r{}", BACKSPACE, green(format!("ПЕРЕБОР:{password_string}||ПЕРЕБРАТО:{total}||    ", )));
-            stdout.flush().unwrap();
+            speed = speed + 1;
+            if start.elapsed() >= one_sek {
+                let mut stdout = stdout();
+                print!("{}\r{}", BACKSPACE, green(format!("СКОРОСТЬ:{speed}/s||ПЕРЕБРАТО:{total}||ПЕРЕБОР:{password_string}||    ", )));
+                stdout.flush().unwrap();
+                speed = 0;
+            }
         } else {
             // или через некоторое время будем сохранять в файл текущий подбор
             if total > time_save_tekushego_bodbora {
@@ -947,7 +956,7 @@ fn bip84_to_h160(address: String) -> [u8; 20] {
 
 
 //сохранение и загрузка базы из файла
-fn save_to_file(set: &BTreeSet<[u8; 20]>, file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn save_to_file(set: &HashSet<[u8; 20]>, file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     match File::create(file_path) {
         Ok(file) => {
             let writer = BufWriter::new(file);
@@ -960,7 +969,7 @@ fn save_to_file(set: &BTreeSet<[u8; 20]>, file_path: &str) -> Result<(), Box<dyn
     }
 }
 
-fn load_from_file(file_path: &str) -> Result<BTreeSet<[u8; 20]>, Box<dyn std::error::Error>> {
+fn load_from_file(file_path: &str) -> Result<HashSet<[u8; 20]>, Box<dyn std::error::Error>> {
     match File::open(file_path) {
         Ok(file) => {
             let reader = BufReader::new(file);
